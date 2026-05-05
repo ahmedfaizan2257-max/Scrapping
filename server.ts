@@ -63,9 +63,24 @@ export async function initApp() {
       // Attempt to parse real data if available
       $('.listing__content__wrapper').each((i, el) => {
         const companyName = $(el).find('.listing__name--link').text().trim();
-        const phone = $(el).find('.mlr__item--phone').text().trim();
+        const rawPhone = $(el).find('.mlr__item--phone').text().trim();
+        const phone = rawPhone.replace(/\\s+/g, ' ').replace(/Phone Number/gi, '').trim();
         const address = $(el).find('.listing__address--full').text().trim();
-        const website = $(el).find('.mlr__item--website a').attr('href');
+        
+        let website = '';
+        const websiteRaw = $(el).find('.mlr__item--website a').attr('href');
+        if (websiteRaw) {
+          if (websiteRaw.includes('redirect=')) {
+            try {
+               const urlObj = new URL('https://yp.ca' + websiteRaw);
+               website = urlObj.searchParams.get('redirect') || websiteRaw;
+            } catch (e) {
+               website = websiteRaw;
+            }
+          } else {
+             website = websiteRaw.startsWith('http') ? websiteRaw : `https://www.yellowpages.ca${websiteRaw}`;
+          }
+        }
 
         if (companyName) {
           results.push({
@@ -121,10 +136,11 @@ export async function initApp() {
 
       const $ = cheerio.load(response.data);
       
-      $('.search-item, .regular-ad').each((i, el) => {
-        const title = $(el).find('.title').text().trim() || $(el).find('a.title').text().trim();
-        const addressMatch = $(el).find('.location').text().trim().replace(/\\s+/g, ' ');
-        const website = $(el).find('a.title').attr('href');
+      $('[data-testid="listing-card"]').each((i, el) => {
+        const titleEl = $(el).find('[data-testid="listing-title"] a, [data-testid="listing-link"], [data-testid="thin-listing-link"]');
+        const title = titleEl.text().trim();
+        const addressMatch = $(el).find('[data-testid="listing-location"]').text().trim().replace(/\\s+/g, ' ');
+        const website = titleEl.attr('href');
         
         if (title) {
           results.push({
