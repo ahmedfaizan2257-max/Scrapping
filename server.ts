@@ -90,7 +90,7 @@ export async function initApp() {
   }
 
   async function scrapeKijiji(query: string, location: string): Promise<Lead[]> {
-    await new Promise(r => setTimeout(r, 1500));
+    await new Promise(r => setTimeout(r, 500));
     const leads: Lead[] = [];
     for(let i = 0; i < 4; i++) {
         leads.push({
@@ -109,22 +109,22 @@ export async function initApp() {
   }
 
   // --- API Routes ---
+  const router = express.Router();
 
-  app.get("/api/health", (req, res) => {
-    res.json({ status: "ok", serverTime: new Date().toISOString() });
+  router.get("/health", (req, res) => {
+    res.json({ status: "ok", env: process.env.NETLIFY ? 'netlify' : 'local' });
   });
 
-  app.get("/api/jobs", (req, res) => {
+  router.get("/jobs", (req, res) => {
     res.json(jobs);
   });
 
-  app.get("/api/leads", (req, res) => {
+  router.get("/leads", (req, res) => {
     res.json(leads);
   });
 
-  app.post("/api/scrape", async (req, res) => {
+  router.post("/scrape", async (req, res) => {
     const { source, query, location, scheduledInterval } = req.body;
-    
     const newJob: ScrapeJob = {
       id: Math.random().toString(36).substr(2, 9),
       source,
@@ -137,63 +137,60 @@ export async function initApp() {
     };
 
     jobs.unshift(newJob);
-    console.log(`Job created: ${newJob.id} for ${source} with query "${query}"`);
 
-    // Run scraping process
     const runScraper = async () => {
-      console.log(`Starting execution for job ${newJob.id}...`);
-      const jobIndexUpdateStatus = jobs.findIndex(j => j.id === newJob.id);
-      if (jobIndexUpdateStatus !== -1) jobs[jobIndexUpdateStatus].status = 'running';
+      const jobIdx = jobs.findIndex(j => j.id === newJob.id);
+      if (jobIdx !== -1) jobs[jobIdx].status = 'running';
 
-      let foundLeads: Lead[] = [];
       try {
+        let foundLeads: Lead[] = [];
         if (source === 'yellow-pages') {
           foundLeads = await scrapeYellowPages(query, location);
         } else if (source === 'kijiji') {
           foundLeads = await scrapeKijiji(query, location);
         } else {
-          await new Promise(r => setTimeout(r, 2000));
+          await new Promise(r => setTimeout(r, 1000));
           foundLeads = [{
-            id: `lead_${Math.random().toString(36).substr(2, 9)}`,
+            id: `l_${Math.random().toString(36).substr(2, 9)}`,
             source,
             name: "Automated Specialist",
             companyName: `${source.toUpperCase()} Partner`,
             phone: "+1-800-SCRAPE-IT",
-            email: `info@${source}.com`,
             capturedAt: new Date().toISOString()
           }];
         }
 
         leads = [...foundLeads, ...leads];
-        console.log(`Job ${newJob.id} finished. Found ${foundLeads.length} leads.`);
-        const jobIndex = jobs.findIndex(j => j.id === newJob.id);
-        if (jobIndex !== -1) {
-          jobs[jobIndex].status = 'completed';
-          jobs[jobIndex].leadsCount = foundLeads.length;
-          jobs[jobIndex].completedAt = new Date().toISOString();
+        const jIdx = jobs.findIndex(j => j.id === newJob.id);
+        if (jIdx !== -1) {
+          jobs[jIdx].status = 'completed';
+          jobs[jIdx].leadsCount = foundLeads.length;
+          jobs[jIdx].completedAt = new Date().toISOString();
         }
       } catch (err) {
-        console.error(`Job ${newJob.id} failed:`, err);
-        const jobIndex = jobs.findIndex(j => j.id === newJob.id);
-        if (jobIndex !== -1) {
-          jobs[jobIndex].status = 'failed';
-          jobs[jobIndex].error = err instanceof Error ? err.message : String(err);
+        const jIdx = jobs.findIndex(j => j.id === newJob.id);
+        if (jIdx !== -1) {
+          jobs[jIdx].status = 'failed';
+          jobs[jIdx].error = String(err);
         }
       }
     };
 
     if (process.env.NETLIFY) {
       await runScraper();
-      // On Netlify, we return the job with updated status immediately
-      const updatedJob = jobs.find(j => j.id === newJob.id);
-      res.json(updatedJob || newJob);
+      res.json(jobs[0]);
     } else {
       runScraper();
       res.json(newJob);
     }
   });
 
-  app.get("/api/export", (req, res) => {
+  // Mount router globally for serverless function root
+  app.use("/api", router);
+  app.use("/", router);
+
+
+  router.get("/export", (req, res) => {
     if (leads.length === 0) {
       return res.status(400).send("No leads to export");
     }
