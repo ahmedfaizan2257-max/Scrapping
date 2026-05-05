@@ -43,6 +43,7 @@ export default function App() {
   const [source, setSource] = useState<ScraperSource>('yellow-pages');
   const [interval, setInterval] = useState<'once' | 'weekly'>('once');
   const [isScraping, setIsScraping] = useState(false);
+  const [serverStatus, setServerStatus] = useState<'online' | 'offline' | 'checking'>('checking');
 
   useEffect(() => {
     fetchData();
@@ -52,18 +53,20 @@ export default function App() {
 
   const fetchData = async () => {
     try {
-      const [jobsRes, leadsRes] = await Promise.all([
-        fetch('/api/jobs'),
-        fetch('/api/leads')
-      ]);
-      const [jobsData, leadsData] = await Promise.all([
-        jobsRes.json(),
-        leadsRes.json()
-      ]);
+      const jobsRes = await fetch('/api/jobs');
+      const leadsRes = await fetch('/api/leads');
+      
+      if (!jobsRes.ok || !leadsRes.ok) throw new Error('Server returned error');
+      
+      const jobsData = await jobsRes.json();
+      const leadsData = await leadsRes.json();
+      
       setJobs(jobsData);
       setLeads(leadsData);
+      setServerStatus('online');
     } catch (err) {
       console.error('Failed to fetch data', err);
+      setServerStatus('offline');
     }
   };
 
@@ -307,13 +310,25 @@ export default function App() {
           <footer className="h-10 bg-black border-t border-white/10 flex items-center justify-between px-8 text-[10px] font-mono uppercase tracking-widest text-slate-500">
             <div className="flex items-center gap-6">
               <div className="flex items-center gap-2">
-                <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_5px_rgba(16,185,129,0.5)]"></div>
-                <span className="text-slate-400">Engine: Active</span>
+                <div className={`w-1.5 h-1.5 rounded-full shadow-[0_0_5px_rgba(16,185,129,0.5)] ${
+                  serverStatus === 'online' ? 'bg-emerald-500 animate-pulse' : 
+                  serverStatus === 'offline' ? 'bg-red-500' : 'bg-yellow-500'
+                }`}></div>
+                <span className={serverStatus === 'online' ? 'text-slate-400' : 'text-red-400'}>
+                  Engine: {serverStatus === 'online' ? 'Active' : serverStatus === 'offline' ? 'Offline (Check Server)' : 'Connecting...'}
+                </span>
               </div>
               <span className="text-white/5">|</span>
-              <span>Total Archive: {leads.length} Records</span>
+              <span>Total Archive: {leads.length.toLocaleString()} Records</span>
             </div>
             <div className="flex gap-6">
+              <button 
+                onClick={fetchData}
+                className="hover:text-emerald-500 transition-colors uppercase tracking-widest flex items-center gap-2"
+              >
+                <Clock size={10} /> Sync Now
+              </button>
+              <span className="text-white/5">|</span>
               <span>Log ID: {Math.random().toString(36).substr(2, 6).toUpperCase()}</span>
               <span className="text-emerald-500 font-bold">PRO License</span>
             </div>
