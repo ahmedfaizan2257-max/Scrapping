@@ -1,3 +1,4 @@
+import "dotenv/config";
 import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -35,17 +36,26 @@ export async function initApp() {
     
     try {
       const searchUrl = `https://www.yellowpages.ca/search/si/1/${encodeURIComponent(query)}/${encodeURIComponent(location)}`;
+      let finalUrl = searchUrl;
       console.log(`Scraping YP: ${searchUrl}`);
 
+      if (process.env.ZENROWS_API_KEY) {
+        finalUrl = `https://api.zenrows.com/v1/?apikey=${process.env.ZENROWS_API_KEY}&url=${encodeURIComponent(searchUrl)}`;
+        console.log("Using ZenRows Proxy");
+      } else if (process.env.SCRAPER_API_KEY) {
+        finalUrl = `http://api.scraperapi.com?api_key=${process.env.SCRAPER_API_KEY}&url=${encodeURIComponent(searchUrl)}`;
+        console.log("Using Scraper API Proxy");
+      }
+
       // Basic protection: Dynamic headers
-      const response = await axios.get(searchUrl, {
+      const response = await axios.get(finalUrl, {
         headers: {
           'User-Agent': userAgent.toString(),
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
           'Accept-Language': 'en-US,en;q=0.9',
           'Referer': 'https://www.google.com/'
         },
-        timeout: 6000
+        timeout: 30000
       });
 
       const $ = cheerio.load(response.data);
@@ -74,21 +84,11 @@ export async function initApp() {
       console.error("YellowPages Scrape Error (Request failed):", error instanceof Error ? error.message : error);
     }
 
-    // Simulation fallback if the site blocks the headless request or error occurred
     if (results.length === 0) {
-      console.log("No real data parsed (blocked or error). Providing simulated results for demo.");
-      for(let i = 0; i < 4; i++) {
-        results.push({
-          id: `sim_yp_${Math.random().toString(36).substr(2, 9)}`,
-          source: 'yellow-pages',
-          name: `${query} Admin ${i+1}`,
-          companyName: `${query} ${['Solutions', 'Group', 'Inc', 'Services'][i]}`,
-          phone: `+1 ${Math.floor(Math.random()*900)+100}-555-01${i}${Math.floor(Math.random()*9)}`,
-          address: `${location || 'Canada'}`,
-          email: `contact@${query.toLowerCase().replace(/\s+/g, '')}${i}.ca`,
-          capturedAt: new Date().toISOString()
-        });
+      if (!process.env.SCRAPER_API_KEY && !process.env.ZENROWS_API_KEY) {
+         throw new Error("Netlify/Cloud IP blocked. To get real data, get a free API key at zenrows.com or scraperapi.com and add it as 'ZENROWS_API_KEY' in Environment Variables.");
       }
+      throw new Error("No real data parsed. The website actively blocked the scraper even with proxy.");
     }
     return results;
   }
@@ -99,15 +99,24 @@ export async function initApp() {
     
     try {
       const searchUrl = `https://www.kijiji.ca/b-search.html?formSubmit=true&keywords=${encodeURIComponent(query)}&address=${encodeURIComponent(location)}`;
+      let finalUrl = searchUrl;
       console.log(`Scraping Kijiji: ${searchUrl}`);
 
-      const response = await axios.get(searchUrl, {
+      if (process.env.ZENROWS_API_KEY) {
+        finalUrl = `https://api.zenrows.com/v1/?apikey=${process.env.ZENROWS_API_KEY}&url=${encodeURIComponent(searchUrl)}`;
+        console.log("Using ZenRows Proxy");
+      } else if (process.env.SCRAPER_API_KEY) {
+        finalUrl = `http://api.scraperapi.com?api_key=${process.env.SCRAPER_API_KEY}&url=${encodeURIComponent(searchUrl)}`;
+        console.log("Using Scraper API Proxy");
+      }
+
+      const response = await axios.get(finalUrl, {
         headers: {
           'User-Agent': userAgent.toString(),
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
           'Accept-Language': 'en-US,en;q=0.9'
         },
-        timeout: 6000
+        timeout: 30000
       });
 
       const $ = cheerio.load(response.data);
@@ -135,20 +144,10 @@ export async function initApp() {
     }
     
     if (results.length === 0) {
-      console.log("No real Kijiji data parsed (blocked or error). Providing fallback results.");
-      for(let i = 0; i < 4; i++) {
-          results.push({
-              id: `kj_${Math.random().toString(36).substr(2, 9)}`,
-              source: 'kijiji',
-              name: "Local Specialist",
-              companyName: `${query} Expert ${i+1}`,
-              phone: `555-${Math.floor(Math.random()*900)+100}-${Math.floor(Math.random()*9000)+1000}`,
-              address: location || 'Ontario',
-              website: "https://kijiji.ca",
-              email: `seller${i}@mail.com`,
-              capturedAt: new Date().toISOString()
-          });
+      if (!process.env.SCRAPER_API_KEY && !process.env.ZENROWS_API_KEY) {
+         throw new Error("Netlify/Cloud IP blocked. To get real data, get a free API key at zenrows.com or scraperapi.com and add it as 'ZENROWS_API_KEY' in Environment Variables.");
       }
+      throw new Error("No real data parsed. Kijiji actively blocked the scraper even with proxy.");
     }
     return results;
   }

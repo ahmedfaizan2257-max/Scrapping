@@ -235,9 +235,12 @@ export default function App() {
                       ) : job.status === 'completed' ? (
                         <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full shadow-[0_0_5px_rgba(16,185,129,0.5)]"></div>
                       ) : (
-                        <div className="w-1.5 h-1.5 bg-red-500 rounded-full"></div>
+                        <div className="w-1.5 h-1.5 bg-red-500 rounded-full" title={job.error}></div>
                       )}
                     </div>
+                    {job.error && (
+                      <p className="text-[10px] text-red-400 mt-1">{job.error}</p>
+                    )}
                   </motion.div>
                 ))}
               </AnimatePresence>
