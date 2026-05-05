@@ -53,19 +53,28 @@ export default function App() {
 
   const fetchData = async () => {
     try {
+      console.log('Fetching state from engine...');
       const jobsRes = await fetch('/api/jobs');
       const leadsRes = await fetch('/api/leads');
       
-      if (!jobsRes.ok || !leadsRes.ok) throw new Error('Server returned error');
+      if (!jobsRes.ok) {
+        console.error(`Jobs fetch failed: ${jobsRes.status} ${jobsRes.statusText}`);
+        throw new Error(`Jobs server error: ${jobsRes.status}`);
+      }
+      if (!leadsRes.ok) {
+        console.error(`Leads fetch failed: ${leadsRes.status} ${leadsRes.statusText}`);
+        throw new Error(`Leads server error: ${leadsRes.status}`);
+      }
       
       const jobsData = await jobsRes.json();
       const leadsData = await leadsRes.json();
       
+      console.log('Sync successful:', { jobs: jobsData.length, leads: leadsData.length });
       setJobs(jobsData);
       setLeads(leadsData);
       setServerStatus('online');
     } catch (err) {
-      console.error('Failed to fetch data', err);
+      console.error('Connection Diagnostics:', err);
       setServerStatus('offline');
     }
   };

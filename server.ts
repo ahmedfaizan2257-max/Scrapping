@@ -15,13 +15,16 @@ const __dirname = path.dirname(__filename);
 
 export const app = express();
 
+// In-memory data store for the prototype - global to the module
+let jobs: ScrapeJob[] = [];
+let leads: Lead[] = [];
+
 export async function initApp() {
+  if ((global as any).__app_initialized) return;
+  (global as any).__app_initialized = true;
+
   const PORT = 3000;
   app.use(express.json());
-
-  // In-memory data store for the prototype
-  let jobs: ScrapeJob[] = [];
-  let leads: Lead[] = [];
 
   // --- Scraper Implementations ---
 
@@ -41,7 +44,7 @@ export async function initApp() {
           'Accept-Language': 'en-US,en;q=0.9',
           'Referer': 'https://www.google.com/'
         },
-        timeout: 10000
+        timeout: 6000
       });
 
       const $ = cheerio.load(response.data);
@@ -73,12 +76,12 @@ export async function initApp() {
     // Simulation fallback if the site blocks the headless request or error occurred
     if (results.length === 0) {
       console.log("No real data parsed (blocked or error). Providing simulated results for demo.");
-      for(let i = 0; i < 6; i++) {
+      for(let i = 0; i < 4; i++) {
         results.push({
           id: `sim_yp_${Math.random().toString(36).substr(2, 9)}`,
           source: 'yellow-pages',
           name: `${query} Admin ${i+1}`,
-          companyName: `${query} ${['Solutions', 'Group', 'Inc', 'Services', 'Associates', 'Works'][i]}`,
+          companyName: `${query} ${['Solutions', 'Group', 'Inc', 'Services'][i]}`,
           phone: `+1 ${Math.floor(Math.random()*900)+100}-555-01${i}${Math.floor(Math.random()*9)}`,
           address: `${location || 'Canada'}`,
           email: `contact@${query.toLowerCase().replace(/\s+/g, '')}${i}.ca`,
@@ -216,19 +219,22 @@ export async function initApp() {
   });
 
   // --- Vite Middleware ---
-  if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), "dist");
-    if (fs.existsSync(distPath)) {
-      app.use(express.static(distPath));
-      app.get("*", (req, res) => {
-        res.sendFile(path.join(distPath, "index.html"));
+  // Only handle static files locally. Netlify handles this via the "publish" directory.
+  if (!process.env.NETLIFY) {
+    if (process.env.NODE_ENV !== "production") {
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: "spa",
       });
+      app.use(vite.middlewares);
+    } else {
+      const distPath = path.join(process.cwd(), "dist");
+      if (fs.existsSync(distPath)) {
+        app.use(express.static(distPath));
+        app.get("*", (req, res) => {
+          res.sendFile(path.join(distPath, "index.html"));
+        });
+      }
     }
   }
 
@@ -239,4 +245,7 @@ export async function initApp() {
   }
 }
 
-initApp();
+// Only run initApp automatically if NOT in Netlify (Netlify handles it in the function)
+if (!process.env.NETLIFY) {
+  initApp();
+}
