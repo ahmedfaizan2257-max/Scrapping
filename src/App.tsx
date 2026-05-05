@@ -54,8 +54,8 @@ export default function App() {
   const fetchData = async () => {
     try {
       console.log('Fetching state from engine...');
-      const jobsRes = await fetch('/api/jobs');
-      const leadsRes = await fetch('/api/leads');
+      const jobsRes = await fetch('/api/tasks');
+      const leadsRes = await fetch('/api/records');
       
       if (!jobsRes.ok) {
         console.error(`Jobs fetch failed: ${jobsRes.status} ${jobsRes.statusText}`);
@@ -83,7 +83,7 @@ export default function App() {
     if (!query) return;
     setIsScraping(true);
     try {
-      await fetch('/api/scrape', {
+      await fetch('/api/process', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ source, query, location, scheduledInterval: interval })
@@ -97,7 +97,7 @@ export default function App() {
   };
 
   const handleExport = () => {
-    window.open('/api/export', '_blank');
+    window.open('/api/download', '_blank');
   };
 
   return (

@@ -1,22 +1,21 @@
 # Deployment Guide for LeadHarvest
 
-Your application is a **Stateful Full-Stack App**. Unlike a static website, it requires a persistent environment to handle background scraping and scheduling.
+LeadHarvest is a **Stateful Full-Stack App**. To keep your leads saved in memory and ensure scrapers don't time out, we recommend a **Persistent Server** over serverless platforms like Netlify.
 
-## Recommended: Render.com (Easiest)
-1. **Connect GitHub:** Push your code to a GitHub repository.
-2. **New Web Service:** Select your repository in Render.
-3. **Settings:**
-   - **Environment:** `Node`
+## Recommended: Persistent Server (Render / Railway / VPS)
+This is the best way to run LeadHarvest.
+1. **GitHub:** Push your code to GitHub.
+2. **Setup:**
    - **Build Command:** `npm install && npm run build`
    - **Start Command:** `npm start`
-4. **Environment Variables:** Add `GEMINI_API_KEY` if you plan to use AI features later.
+   - **Environment Variable:** Set `NODE_ENV=production`.
+3. **Benefits:**
+   - Leads stay in the dashboard as long as the server is running.
+   - Long-running scrapers won't be killed mid-way.
 
-## Recommended: Railway.app
-1. **New Project:** Connect your GitHub repo.
-2. **Auto-Detect:** Railway will detect the `package.json` and `server.ts`.
-3. **Deployment:** It will automatically run the build and start scripts.
-
-## Note on Netlify/Vercel
-These platforms use **Serverless Functions**. To use them, you would need to:
-1. Replace in-memory storage (`leads` array) with a database like **Firebase** or **MongoDB**.
-2. Replace `node-cron` with a cloud scheduler (like Netlify Scheduled Functions or GitHub Actions).
+## Alternative: Netlify (Limited)
+If you must use Netlify:
+- **Note:** Data resets every time the function wakes up (In-memory storage limitation).
+- **Setup:** The project includes `netlify.toml` and `netlify/functions/api.ts` for this purpose.
+- **Build:** `npm run build`
+- **Publish Directory:** `dist`
