@@ -13,10 +13,10 @@ import fs from "fs";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-async function startServer() {
-  const app = express();
-  const PORT = 3000;
+export const app = express();
 
+export async function initApp() {
+  const PORT = 3000;
   app.use(express.json());
 
   // In-memory data store for the prototype
@@ -139,9 +139,9 @@ async function startServer() {
     jobs.unshift(newJob);
     console.log(`Job created: ${newJob.id} for ${source} with query "${query}"`);
 
-    // Run scraping in background
-    (async () => {
-      console.log(`Starting background scrape for job ${newJob.id}...`);
+    // Run scraping process
+    const runScraper = async () => {
+      console.log(`Starting execution for job ${newJob.id}...`);
       const jobIndexUpdateStatus = jobs.findIndex(j => j.id === newJob.id);
       if (jobIndexUpdateStatus !== -1) jobs[jobIndexUpdateStatus].status = 'running';
 
@@ -152,7 +152,6 @@ async function startServer() {
         } else if (source === 'kijiji') {
           foundLeads = await scrapeKijiji(query, location);
         } else {
-          // Placeholder for others
           await new Promise(r => setTimeout(r, 2000));
           foundLeads = [{
             id: `lead_${Math.random().toString(36).substr(2, 9)}`,
@@ -181,9 +180,17 @@ async function startServer() {
           jobs[jobIndex].error = err instanceof Error ? err.message : String(err);
         }
       }
-    })();
+    };
 
-    res.json(newJob);
+    if (process.env.NETLIFY) {
+      await runScraper();
+      // On Netlify, we return the job with updated status immediately
+      const updatedJob = jobs.find(j => j.id === newJob.id);
+      res.json(updatedJob || newJob);
+    } else {
+      runScraper();
+      res.json(newJob);
+    }
   });
 
   app.get("/api/export", (req, res) => {
@@ -228,9 +235,11 @@ async function startServer() {
     }
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running at http://localhost:${PORT}`);
-  });
+  if (process.env.NODE_ENV !== "test" && !process.env.NETLIFY) {
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`Server running at http://localhost:${PORT}`);
+    });
+  }
 }
 
-startServer();
+initApp();

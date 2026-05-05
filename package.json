@@ -24,6 +24,7 @@
     "node-cron": "^4.2.1",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
+    "serverless-http": "^4.0.0",
     "user-agents": "^2.1.51",
     "vite": "^6.2.3",
     "xlsx": "^0.18.5"
